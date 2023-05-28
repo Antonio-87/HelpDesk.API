@@ -1,154 +1,84 @@
-const fs = require('fs');
-const http = require('http');
 const Koa = require('koa');
-const { koaBody } = require('koa-body');
-const koaStatic = require('koa-static');
-const path = require('path');
-const uuid = require('uuid');
-const process = require('node:process');
+const BodyParser = require('koa-bodyparser');
+const Router = require('koa-router');
+const cors = require('koa2-cors');
+const { v4: uuidv4 } = require('uuid');
+const formatDate = require('./formatDate');
+const Ticket = require('./Ticket');
+const TicketFull = require('./TicketFull');
+// import formatDate from './formatDate.js';
+// import Ticket from './Ticket.js';
+// import TicketFull from './TicketFull.js';
 
 const app = new Koa();
- 
+const router = new Router();
 
-let subscriptions = [];
+let tickets = [];
+let ticketsFull = [];
 
-const public = path.join(__dirname, '/public');
+app.use(cors());
 
-app.use(koaStatic(public));
-
-app.use(koaBody({
-  urlencoded: true,
-  multipart: true,
-}));
-
-app.use((ctx, next) => {
-  ctx.response.body = 'server response';
-  next();
-});
-
-app.use((ctx, next) => {
-  if (ctx.request.method !== 'OPTIONS') {
-    next();
-
-    return;
-  }
-
-  ctx.response.set('Access-Control-Allow-Origin', '*');
-
-  ctx.response.set('Access-Control-Allow-Methods', 'DELETE, PUT, PATCH, GET, POST');
-
-  ctx.response.status = 204;
-});
-
-app.use((ctx, next) => {
-  if (ctx.request.method !== 'POST' && ctx.request.url !== '/upload') {
-    next();
-
-    return;
-  }
-
-  ctx.response.set('Access-Control-Allow-Origin', '*');
-
-  console.log(ctx.request.files);
-
-  let fileName;
-
-  try {
-    const public = path.join(__dirname, '/public');
-
-    const { file } = ctx.request.files;
-
-    const subfolder = uuid.v4();
-
-    const uploadFolder = public + '/' + subfolder;
-
-    fs.mkdirSync(uploadFolder)
-    fs.copyFileSync(file.path, uploadFolder + '/' + file.name);
-
-    fileName = '/' + subfolder + '/' + file.name;
-  } catch (error) {
-    ctx.response.status = 500;
-    
-    return;
-  }
-
-  ctx.response.body = fileName;
-});
-
-app.use((ctx, next) => {
-  if (ctx.request.method !== 'POST') {
-    next();
-
-    return;
-  }
-
-  console.log(ctx.request.body);
-
-  const { name, phone } = ctx.request.body;
-
-  ctx.response.set('Access-Control-Allow-Origin', '*');
-
-  if (subscriptions.some(sub => sub.phone === phone)) {
-    ctx.response.status = 400;
-    ctx.response.body = 'subscription exists';
-
-    return;
-  }
-
-  subscriptions.push({ name, phone });
-
-  ctx.response.body = 'OK';
-
-  next();
-});
-
-app.use((ctx, next) => {
-  if (ctx.request.method !== 'DELETE') {
-    next();
-
+// создание нового тикета (принимает formData, id = null)
+router.post('/createTicket', async (ctx, next) => {
+  const { id, name, description, status } = ctx.request.body;
+  const uniqueId = uuidv4();
+  const date = formatDate(Date.now());
+  if (tickets.some(ticket => ticket.id !== id)) {
+    const ticket = new Ticket(uniqueId, name, status, date);
+    const ticketFull = new TicketFull(uniqueId, name, description, status, date);
+    tickets.push(ticket);
+    ticketsFull.push(ticketFull);
+    ctx.status = 201; // Created
+    ctx.body = { ticket };
     return;
   }
   
-  console.log(ctx.request.query);
-
-  const { phone } = ctx.request.query;
-
-  ctx.response.set('Access-Control-Allow-Origin', '*');
-
-  if (subscriptions.every(sub => sub.phone !== phone)) {
-    ctx.response.status = 400;
-    ctx.response.body = 'subscription doesn\'t exists';
-
-    return;
-  }
-
-  subscriptions = subscriptions.filter(sub => sub.phone !== phone);
-
-  ctx.response.body = 'OK';
-
-  next();
+  ctx.throw(304, 'Already have a ticket with that name');
 });
 
-const server = http.createServer(app.callback());
-
-const port = process.env.PORT || 8080;
-
-server.listen(port, (err) => {
-  if (err) {
-    console.log(err);
-
-    return;
-  }
-
-  console.log('Server is listening to ' + port);
+// получение всех тикетов (массив объектов Ticket)
+router.get('/allTickets', async (ctx, next) => {
+  ctx.body = { tickets };
 });
 
-process.on('SIGINT', () => {
-  console.info('SIGINT signal received.');
-  console.log('Closing http server.');
-  server.close(() => {
-    console.log('Http server closed.');
-    process.exit();
-  });
-  
+// получение тикета по id (объект TicketFull)
+router.get('/tickets/:id', async (ctx, next) => {
+  const ticket = tickets.find(ticket => ticket.id === parseInt(ctx.params.id));
+  ticket
+    ? ctx.body = { ticket }
+    : ctx.throw(404, 'Ticket not found');
+});
+
+// обновление тикета по id
+router.put('/tickets/:id', async (ctx, next) => {
+  const ticket = tickets.find(ticket => ticket.id === parseInt(ctx.params.id));
+  if (!ticket) {
+    ctx.throw(404, 'Ticket not found');
+  } else {
+    const { name, description, status } = ctx.request.body;
+    ticket.name = name || ticket.name;
+    ticket.description = description || ticket.description;
+    ticket.status = status || ticket.status;
+    ctx.status = 200;
+    ctx.body = { ticket };
+  }
+});
+
+// удаление тикета по id
+router.delete('/tickets/:id', async (ctx, next) => {
+  const index = tickets.findIndex(ticket => ticket.id === parseInt(ctx.params.id));
+  if (index === -1) {
+    ctx.throw(404, 'Ticket not found');
+  } else {
+    tickets.splice(index, 1);
+    ctx.status = 204; // No Content
+  }
+});
+
+app.use(BodyParser());
+app.use(router.routes());
+app.use(router.allowedMethods());
+
+app.listen(8080, () => {
+  console.log('Server running on port 8080');
 });
