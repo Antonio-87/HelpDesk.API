@@ -1,10 +1,10 @@
-const Ticket = require('./Ticket');
+const Task = require('./Task');
 
-class TicketFull extends Ticket {
+class TaskFull extends Task {
     constructor(id, name, description, status, created) {
         super(id, name, status, created);
         this.description = description;
     }
 } 
 
-module.exports = TicketFull;
+module.exports = TaskFull;

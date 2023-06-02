@@ -1,4 +1,4 @@
-class Ticket {
+class Task {
     constructor(id, name, status, created) {
         this.id = id;
         this.name = name;
@@ -12,4 +12,4 @@ class Ticket {
     }
 }
 
-module.exports = Ticket;
+module.exports = Task;
