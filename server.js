@@ -60,7 +60,6 @@ router.put('/tasks/:id', async (ctx, next) => {
     task.status = status || task.status;
     taskFull.status = task.status;
     ctx.status = 200;
-    ctx.body = { task };
   }
 });
 
