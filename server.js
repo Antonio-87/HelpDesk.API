@@ -40,9 +40,9 @@ router.get('/allTasks', async (ctx, next) => {
 
 // получение задачи по id (объект TaskFull)
 router.get('/tasks/:id', async (ctx, next) => {
-  const task = tasksFull.find(task => task.id === parseInt(ctx.params.id));
-  task
-    ? ctx.body = { task }
+  const taskFull = tasksFull.find(task => task.id === parseInt(ctx.params.id));
+  taskFull
+    ? ctx.body = { taskFull }
     : ctx.throw(404, 'Task not found');
 });
 
