@@ -41,7 +41,7 @@ router.get('/allTasks', async (ctx, next) => {
 
 // получение задачи по id (объект TaskFull)
 router.get('/tasks/:id', async (ctx, next) => {
-  const taskFull = tasksFull.find(task => task.id === Number.parseInt(ctx.params.id));
+  const taskFull = tasksFull.find(task => task.id === ctx.params.id);
   taskFull
     ? ctx.body = { taskFull }
     : ctx.throw(404, 'Task not found');
@@ -49,25 +49,24 @@ router.get('/tasks/:id', async (ctx, next) => {
 
 // обновление задачи по id
 router.put('/tasks/:id', async (ctx, next) => {
-  const task = tasks.find(task => task.id === Number.parseInt(ctx.params.id));
-  const taskFull = tasksFull.find(task => task.id === Number.parseInt(ctx.params.id));
+  const { name, description, status } = ctx.request.body;
+  const task = tasks.find(task => task.id === ctx.params.id);
+  const taskFull = tasksFull.find(task => task.id === ctx.params.id);
   if (!task && !taskFull) {
     ctx.throw(404, 'Task not found');
-  } else {
-    const { name, description, status } = ctx.request.body;
-    task.name = name || task.name;
-    taskFull.name = task.name;
-    taskFull.description = description || taskFull.description;
-    task.status = status || task.status;
-    taskFull.status = task.status;
-    ctx.status = 200;
   }
+  task.name = name ? name : task.name;
+  taskFull.name = task.name;
+  taskFull.description = description ? description : taskFull.description;
+  task.status = status !== null ? status : task.status;
+  taskFull.status = task.status;
+  ctx.status = 200;
 });
 
 // удаление задачи по id
 router.delete('/tasks/:id', async (ctx, next) => {
-  const indexTask = tasks.find(task => task.id === Number.parseInt(ctx.params.id));
-  const indexTaskFull = tasksFull.find(task => task.id === Number.parseInt(ctx.params.id));
+  const indexTask = tasks.find(task => task.id === ctx.params.id);
+  const indexTaskFull = tasksFull.find(task => task.id === ctx.params.id);
   if (indexTask === -1 && indexTaskFull === -1) {
     ctx.throw(404, 'Task not found');
   } else {
